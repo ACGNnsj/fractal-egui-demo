@@ -30,6 +30,8 @@ impl MyApp {
         let device = &wgpu_render_state.device;
         let target_format = wgpu_render_state.target_format;
 
+        // let target_format = wgpu::TextureFormat::Rgba32Float;
+
         let util = RenderUtils::new(device, target_format, palette);
         let texture_id = {
             let mut renderer = wgpu_render_state.renderer.write();
@@ -43,7 +45,7 @@ impl MyApp {
             .insert(util);
 
         let texts = ["cubehelix", "sinebow", "rainbow", "turbo", "cividis", "warm", "cool"];
-        let mut text_map = {
+        let text_map = {
             let mut map = HashMap::new();
             for i in 0..KEYS.len() {
                 map.insert(KEYS[i], texts[i].to_string());
@@ -51,7 +53,7 @@ impl MyApp {
             map
         };
         let presets = [colorgrad::cubehelix_default, colorgrad::sinebow, colorgrad::rainbow, colorgrad::turbo, colorgrad::cividis, colorgrad::warm, colorgrad::cool];
-        let mut gradient_map: HashMap<i32, fn() -> Gradient> = {
+        let gradient_map: HashMap<i32, fn() -> Gradient> = {
             let mut map: HashMap<i32, fn() -> Gradient> = HashMap::new();
             for i in 0..KEYS.len() {
                 map.insert(KEYS[i], presets[i]);
@@ -206,7 +208,6 @@ impl App for MyApp {
 }
 
 fn main() {
-    let f = colorgrad::cubehelix_default;
     let grad = colorgrad::cubehelix_default().sharp(COLOR_NUM, 0.);
     // let colors=grad.take(1000).collect::<Vec<_>>();
     let colors = grad.colors(COLOR_NUM);
@@ -215,10 +216,11 @@ fn main() {
         rgba_array[i] = [c.r as f32, c.g as f32, c.b as f32, c.a as f32];
     }
     let native_options = eframe::NativeOptions {
-        initial_window_size: Some(Vec2::new(900.0, 900.0)),
+        initial_window_size: Some(Vec2::new(1024.0, 1024.0)),
         centered: true,
         renderer: eframe::Renderer::Wgpu,
         wgpu_options: WgpuConfiguration {
+            // supported_backends: wgpu::Backends::DX12,
             device_descriptor: Arc::new(|adapter| {
                 let base_limits = if adapter.get_info().backend == wgpu::Backend::Gl {
                     wgpu::Limits::downlevel_webgl2_defaults()
@@ -232,7 +234,7 @@ fn main() {
                     limits: wgpu::Limits {
                         // When using a depth buffer, we have to be able to create a texture
                         // large enough for the entire surface, and we want to support 4k+ displays.
-                        max_texture_dimension_2d: 8192,
+                        max_texture_dimension_2d: 32768,
                         ..base_limits
                     },
                 }

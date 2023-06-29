@@ -2,12 +2,12 @@ use std::sync::Arc;
 use eframe::{egui::{self, plot::PlotBounds}, egui_wgpu, wgpu};
 
 const MSAA_SAMPLE_COUNT: u32 = 1;
-const MAX_POINTS: usize = 6;
+const VERTEX_NUM: usize = 6;
 
 const DEFAULT_WIDTH: u32 = 1;
 const DEFAULT_HEIGHT: u32 = 1;
 
-const MAX_ITERATIONS: u32 = 32768;
+const MAX_ITERATIONS: u32 = 65536;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
@@ -126,7 +126,7 @@ impl RenderUtils {
 
         let vertex_buffer = <wgpu::Device as wgpu::util::DeviceExt>::create_buffer_init(device, &wgpu::util::BufferInitDescriptor {
             label: Some("egui_plot_vertices"),
-            contents: bytemuck::cast_slice(&vec![Vertex::default(); MAX_POINTS]),
+            contents: bytemuck::cast_slice(&vec![Vertex::default(); VERTEX_NUM]),
             usage: wgpu::BufferUsages::COPY_DST
                 | wgpu::BufferUsages::MAP_WRITE
                 | wgpu::BufferUsages::VERTEX,
@@ -143,7 +143,7 @@ impl RenderUtils {
 
         // Allocate some stand-in textures since we don't know the final width
         // and height yet.
-        let texture = Self::create_texture(device, target_format, 1, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        let texture = Self::create_texture(device, target_format, MSAA_SAMPLE_COUNT, DEFAULT_WIDTH, DEFAULT_HEIGHT);
         let multisampled_texture = Self::create_texture(
             device,
             target_format,
@@ -213,7 +213,7 @@ impl RenderUtils {
             self.height = dimensions[1];
 
             self.texture =
-                Self::create_texture(device, self.target_format, 1, self.width, self.height);
+                Self::create_texture(device, self.target_format, MSAA_SAMPLE_COUNT, self.width, self.height);
             self.multisampled_texture = Self::create_texture(
                 device,
                 self.target_format,
