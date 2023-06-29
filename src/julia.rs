@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use eframe::{egui::{self, plot::PlotBounds}, egui_wgpu, wgpu};
+use crate::wgsl_struct::{UniformParams, Vertex};
 
 const MSAA_SAMPLE_COUNT: u32 = 1;
 const VERTEX_NUM: usize = 6;
@@ -7,32 +8,7 @@ const VERTEX_NUM: usize = 6;
 const DEFAULT_WIDTH: u32 = 1;
 const DEFAULT_HEIGHT: u32 = 1;
 
-const MAX_ITERATIONS: u32 = 65536;
-
-#[repr(C)]
-#[derive(Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct Vertex {
-    pub position: [f32; 2],
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, /*Default,*/ bytemuck::Pod, bytemuck::Zeroable)]
-pub struct UniformParams {
-    // 0    8
-    pub x_bounds: [f32; 2],
-    // 8    8
-    pub y_bounds: [f32; 2],
-    // 16   4
-    pub max_iterations: u32,
-    // 20
-    pub padding0: u32,
-    // 24
-    pub padding1: u64,
-    // 32   16
-    pub palette: [[f32; 4]; crate::COLOR_NUM],
-}
-
-pub struct RenderUtils {
+pub struct JuliaRenderUtils {
     pipeline: wgpu::RenderPipeline,
     target_format: wgpu::TextureFormat,
     bind_group: wgpu::BindGroup,
@@ -47,13 +23,15 @@ pub struct RenderUtils {
     height: u32,
 
     palette: [[f32; 4]; crate::COLOR_NUM],
+    max_iterations: u32,
+    c: [f32; 2],
 }
 
-impl RenderUtils {
-    pub fn new(device: &wgpu::Device, target_format: wgpu::TextureFormat, palette: [[f32; 4]; crate::COLOR_NUM]) -> RenderUtils {
+impl JuliaRenderUtils {
+    pub fn new(device: &wgpu::Device, target_format: wgpu::TextureFormat, palette: [[f32; 4]; crate::COLOR_NUM], max_iterations: u32) -> JuliaRenderUtils {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("egui_plot_line_shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("./fractal_shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("julia_shader.wgsl").into()),
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -114,9 +92,9 @@ impl RenderUtils {
             contents: bytemuck::cast_slice(&[UniformParams {
                 x_bounds: [-1.0, 1.0],
                 y_bounds: [-1.0, 1.0],
-                max_iterations: MAX_ITERATIONS,
+                max_iterations,
                 padding0: 0,
-                padding1: 0,
+                c: [0.0, 0.0],
                 palette,
             }]),
             usage: wgpu::BufferUsages::COPY_DST
@@ -152,7 +130,7 @@ impl RenderUtils {
             DEFAULT_HEIGHT,
         );
 
-        RenderUtils {
+        JuliaRenderUtils {
             pipeline,
             target_format,
             bind_group,
@@ -164,11 +142,14 @@ impl RenderUtils {
             width: DEFAULT_WIDTH,
             height: DEFAULT_HEIGHT,
             palette,
+            max_iterations,
+            c: [0.0, 0.0],
         }
     }
     pub fn set_palette(&mut self, palette: [[f32; 4]; crate::COLOR_NUM]) {
         self.palette = palette;
     }
+
     fn create_texture(
         device: &wgpu::Device,
         target_format: wgpu::TextureFormat,
@@ -229,9 +210,9 @@ impl RenderUtils {
             bytemuck::cast_slice(&[UniformParams {
                 x_bounds: [bounds.min()[0] as f32, bounds.max()[0] as f32],
                 y_bounds: [bounds.min()[1] as f32, bounds.max()[1] as f32],
-                max_iterations: MAX_ITERATIONS,
+                max_iterations: self.max_iterations,
                 padding0: 0,
-                padding1: 0,
+                c: self.c,
                 palette: self.palette,
             }]),
         );
@@ -292,6 +273,18 @@ impl RenderUtils {
         rpass.set_bind_group(0, &self.bind_group, &[]);
         rpass.draw(0..self.vertex_count, 0..1);
     }
+    pub fn set_max_iterations(&mut self, max_iterations: u32) {
+        self.max_iterations = max_iterations;
+    }
+    pub fn max_iterations(&self) -> u32 {
+        self.max_iterations
+    }
+    pub fn c(&self) -> [f32; 2] {
+        self.c
+    }
+    pub fn set_c(&mut self, c: [f32; 2]) {
+        self.c = c;
+    }
 }
 
 pub fn egui_wgpu_callback(
@@ -302,7 +295,7 @@ pub fn egui_wgpu_callback(
 ) -> egui::PaintCallback {
     let cb =
         egui_wgpu::CallbackFn::new().prepare(move |device, queue, command_encoder, paint_callback_resources| {
-            let util: &mut RenderUtils = paint_callback_resources.get_mut().unwrap();
+            let util: &mut JuliaRenderUtils = paint_callback_resources.get_mut().unwrap();
 
             util.prepare(
                 device,
