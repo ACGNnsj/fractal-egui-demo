@@ -27,8 +27,8 @@ fn vs_main(@location(0) position: vec2<f32>) -> VertexOut {
 
 @fragment
 fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
-    let x = in.uv.x;
-    let y = in.uv.y;
+//    let x = in.uv.x;
+//    let y = in.uv.y;
     var iterations = 0u;
     var escaped = false;
     var z= vec2<f32>(0.0, 0.0);
@@ -38,7 +38,7 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
             iterations = i + 1u;
             break;
         }
-        z= iter(z, vec2<f32>(x, y));
+        z= iter(z, in.uv);
     }
     if (!escaped) {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);

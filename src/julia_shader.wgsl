@@ -32,7 +32,7 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
 //    let y = in.uv.y;
     var iterations = 0u;
     var escaped = false;
-    var z= vec2<f32>(in.uv.x, in.uv.y);
+    var z = in.uv;
     for (var i = 0u; i < uniforms.max_iterations; i++) {
         if (z.x * z.x + z.y * z.y > 4.0) {
             escaped = true;

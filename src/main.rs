@@ -55,7 +55,7 @@ impl MyApp {
             .paint_callback_resources
             .insert(mandelbrot_util);
 
-        let julia_util = julia::JuliaRenderUtils::new(device, target_format, palette, MAX_ITERATIONS);
+        let julia_util = JuliaRenderUtils::new(device, target_format, palette, MAX_ITERATIONS);
         let julia_texture_id = {
             let mut renderer = wgpu_render_state.renderer.write();
             renderer.register_native_texture(device, &julia_util.create_view(), wgpu::FilterMode::Linear)
@@ -162,7 +162,8 @@ fn julia_vertices() -> Vec<Vertex> {
 
 impl App for MyApp {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+        static mut JULIA_PAINTED: bool = false;
+        egui::CentralPanel::default().show(ctx, |ui| unsafe {
             ui.horizontal(|ui| {
                 ui.toggle_value(&mut self.show_mandelbrot, "Mandelbrot");
                 ui.toggle_value(&mut self.show_julia, "Julia");
@@ -180,10 +181,10 @@ impl App for MyApp {
                         }
                     });
                 if self.show_julia {
-                    ui.label("c.Re");
-                    ui.add(egui::Slider::new(&mut self.c[0], -2.0..=2.0).step_by(0.01));
-                    ui.label("c.Im");
-                    ui.add(egui::Slider::new(&mut self.c[1], -2.0..=2.0).step_by(0.01));
+                    ui.label("Re(c)");
+                    ui.add(egui::Slider::new(&mut self.c[0], -2.0..=2.0).step_by(0.001));
+                    ui.label("Im(c)");
+                    ui.add(egui::Slider::new(&mut self.c[1], -2.0..=2.0).step_by(0.001));
                 }
             });
 
@@ -255,6 +256,10 @@ impl App for MyApp {
             }
 
             if self.show_julia {
+                if !JULIA_PAINTED {
+                    self.dirty = true;
+                    JULIA_PAINTED = true;
+                }
                 let mut bounds = PlotBounds::NOTHING;
                 let resp = egui::plot::Plot::new("Julia_plot")
                     .legend(Legend::default())
