@@ -2,7 +2,7 @@ use std::sync::Arc;
 use eframe::{egui::{self, plot::PlotBounds}, egui_wgpu, wgpu};
 
 const MSAA_SAMPLE_COUNT: u32 = 1;
-const MAX_POINTS: usize = 5_000_000;
+const MAX_POINTS: usize = 6;
 
 const DEFAULT_WIDTH: u32 = 1;
 const DEFAULT_HEIGHT: u32 = 1;
@@ -165,6 +165,9 @@ impl RenderUtils {
             height: DEFAULT_HEIGHT,
             palette,
         }
+    }
+    pub fn set_palette(&mut self, palette: [[f32; 4]; crate::COLOR_NUM]) {
+        self.palette = palette;
     }
     fn create_texture(
         device: &wgpu::Device,

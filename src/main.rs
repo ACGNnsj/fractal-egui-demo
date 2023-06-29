@@ -1,10 +1,14 @@
 mod util;
 
+use std::collections::HashMap;
 use std::sync::Arc;
+use colorgrad::Gradient;
 use eframe::{App, CreationContext, egui::{self, Context, plot::{Legend, PlotBounds, PlotImage}}, egui_wgpu::WgpuConfiguration, emath::Vec2, epaint::{self}, Frame, wgpu};
 use crate::util::{RenderUtils, Vertex};
 
 const COLOR_NUM: usize = 128;
+
+// static mut SELECTED: i32 =1;
 
 pub struct MyApp {
     show_cpu: bool,
@@ -12,6 +16,11 @@ pub struct MyApp {
     dirty: bool,
     texture_id: epaint::TextureId,
     points: Arc<Vec<Vertex>>,
+    last_selected: i32,
+    selected: i32,
+    text_map: HashMap<i32, String>,
+    // gradient_map: HashMap<String, dyn Fn() -> Gradient>,
+    gradient_map: HashMap<i32, fn() -> Gradient>,
 }
 
 impl MyApp {
@@ -32,13 +41,32 @@ impl MyApp {
             .write()
             .paint_callback_resources
             .insert(util);
-
+        let mut text_map = HashMap::new();
+        text_map.insert(0, "cubehelix".to_string());
+        text_map.insert(1, "sinebow".to_string());
+        text_map.insert(2, "rainbow".to_string());
+        text_map.insert(3, "turbo".to_string());
+        text_map.insert(4, "cividis".to_string());
+        text_map.insert(5, "warm".to_string());
+        text_map.insert(6, "cool".to_string());
+        let mut gradient_map: HashMap<i32, fn() -> Gradient> = HashMap::new();
+        gradient_map.insert(0, colorgrad::cubehelix_default);
+        gradient_map.insert(1, colorgrad::sinebow);
+        gradient_map.insert(2, colorgrad::rainbow);
+        gradient_map.insert(3, colorgrad::turbo);
+        gradient_map.insert(4, colorgrad::cividis);
+        gradient_map.insert(5, colorgrad::warm);
+        gradient_map.insert(6, colorgrad::cool);
         Some(Self {
             show_cpu: false,
             show_gpu: true,
             dirty: true,
             texture_id,
             points: Arc::new(default_vertices()),
+            last_selected: 0,
+            selected: 0,
+            text_map,
+            gradient_map,
         })
     }
 }
@@ -81,6 +109,15 @@ impl App for MyApp {
 
                 ui.toggle_value(&mut self.show_cpu, "CPU");
                 ui.toggle_value(&mut self.show_gpu, "GPU");
+                egui::ComboBox::from_label("Select one!")
+                    .selected_text(self.text_map.get(&self.selected).unwrap_or(&"None".to_string()))
+                    // .selected_text(format!("{:?}", self.selected))
+                    .show_ui(ui, |ui| {
+                        // ui.selectable_value(&mut self.selected, 1, "First");
+                        for (selected, text) in self.text_map.iter() {
+                            ui.selectable_value(&mut self.selected, *selected, text);
+                        }
+                    }, );
             });
 
             // if self.q != [new_sigma, new_rho, new_beta] {
@@ -132,6 +169,22 @@ impl App for MyApp {
                 });
 
             if self.show_gpu {
+                // Update the texture handle in egui from the previously
+                // rendered texture (from the last frame).
+                let wgpu_render_state = frame.wgpu_render_state().unwrap();
+                let mut renderer = wgpu_render_state.renderer.write();
+
+                let util: &mut RenderUtils = renderer.paint_callback_resources.get_mut().unwrap();
+
+                if self.selected != self.last_selected {
+                    self.dirty = true;
+                    let preset: &fn() -> Gradient = self.gradient_map.get(&self.selected).unwrap_or(&(colorgrad::cubehelix_default as fn() -> Gradient));
+                    let grad = preset().sharp(COLOR_NUM, 0.);
+                    let rgba_array: [[f32; 4]; COLOR_NUM] = grad.colors(COLOR_NUM).iter().map(|c| [c.r as f32, c.g as f32, c.b as f32, c.a as f32]).collect::<Vec<[f32; 4]>>().try_into().unwrap();
+                    util.set_palette(rgba_array);
+                }
+
+
                 // Add a callback to egui to render the plot contents to
                 // texture.
                 ui.painter().add(util::egui_wgpu_callback(
@@ -141,13 +194,8 @@ impl App for MyApp {
                     self.dirty,
                 ));
 
-                // Update the texture handle in egui from the previously
-                // rendered texture (from the last frame).
-                let wgpu_render_state = frame.wgpu_render_state().unwrap();
-                let mut renderer = wgpu_render_state.renderer.write();
 
-                let plot: &RenderUtils = renderer.paint_callback_resources.get().unwrap();
-                let texture_view = plot.create_view();
+                let texture_view = util.create_view();
 
                 renderer.update_egui_texture_from_wgpu_texture(
                     &wgpu_render_state.device,
@@ -158,11 +206,13 @@ impl App for MyApp {
 
                 self.dirty = false;
             }
+            self.last_selected = self.selected;
         });
     }
 }
 
 fn main() {
+    let f = colorgrad::cubehelix_default;
     let grad = colorgrad::cubehelix_default().sharp(COLOR_NUM, 0.);
     // let colors=grad.take(1000).collect::<Vec<_>>();
     let colors = grad.colors(COLOR_NUM);
