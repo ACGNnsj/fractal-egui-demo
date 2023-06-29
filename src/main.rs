@@ -7,7 +7,7 @@ use eframe::{App, CreationContext, egui::{self, Context, plot::{Legend, PlotBoun
 use crate::util::{RenderUtils, Vertex};
 
 const COLOR_NUM: usize = 128;
-
+const KEYS: [i32; 7] = [0, 1, 2, 3, 4, 5, 6];
 // static mut SELECTED: i32 =1;
 
 pub struct MyApp {
@@ -41,22 +41,23 @@ impl MyApp {
             .write()
             .paint_callback_resources
             .insert(util);
-        let mut text_map = HashMap::new();
-        text_map.insert(0, "cubehelix".to_string());
-        text_map.insert(1, "sinebow".to_string());
-        text_map.insert(2, "rainbow".to_string());
-        text_map.insert(3, "turbo".to_string());
-        text_map.insert(4, "cividis".to_string());
-        text_map.insert(5, "warm".to_string());
-        text_map.insert(6, "cool".to_string());
-        let mut gradient_map: HashMap<i32, fn() -> Gradient> = HashMap::new();
-        gradient_map.insert(0, colorgrad::cubehelix_default);
-        gradient_map.insert(1, colorgrad::sinebow);
-        gradient_map.insert(2, colorgrad::rainbow);
-        gradient_map.insert(3, colorgrad::turbo);
-        gradient_map.insert(4, colorgrad::cividis);
-        gradient_map.insert(5, colorgrad::warm);
-        gradient_map.insert(6, colorgrad::cool);
+
+        let texts = ["cubehelix", "sinebow", "rainbow", "turbo", "cividis", "warm", "cool"];
+        let mut text_map = {
+            let mut map = HashMap::new();
+            for i in 0..KEYS.len() {
+                map.insert(KEYS[i], texts[i].to_string());
+            }
+            map
+        };
+        let presets = [colorgrad::cubehelix_default, colorgrad::sinebow, colorgrad::rainbow, colorgrad::turbo, colorgrad::cividis, colorgrad::warm, colorgrad::cool];
+        let mut gradient_map: HashMap<i32, fn() -> Gradient> = {
+            let mut map: HashMap<i32, fn() -> Gradient> = HashMap::new();
+            for i in 0..KEYS.len() {
+                map.insert(KEYS[i], presets[i]);
+            }
+            map
+        };
         Some(Self {
             show_cpu: false,
             show_gpu: true,
@@ -98,25 +99,18 @@ impl App for MyApp {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
-                // for (l, v, range) in [
-                //     ("σ", &mut new_sigma, 0.0..=20.0),
-                //     ("ρ", &mut new_rho, 0.0..=50.0),
-                //     ("β", &mut new_beta, 0.0..=10.0),
-                // ] {
-                //     ui.label(l);
-                //     ui.add(egui::Slider::new(v, range).step_by(0.01));
-                // }
-
                 ui.toggle_value(&mut self.show_cpu, "CPU");
                 ui.toggle_value(&mut self.show_gpu, "GPU");
                 egui::ComboBox::from_label("Select one!")
                     .selected_text(self.text_map.get(&self.selected).unwrap_or(&"None".to_string()))
                     // .selected_text(format!("{:?}", self.selected))
                     .show_ui(ui, |ui| {
-                        // ui.selectable_value(&mut self.selected, 1, "First");
-                        for (selected, text) in self.text_map.iter() {
-                            ui.selectable_value(&mut self.selected, *selected, text);
+                        for key in KEYS {
+                            ui.selectable_value(&mut self.selected, key, self.text_map.get(&key).unwrap_or(&"None".to_string()));
                         }
+                        /*for (selected, text) in self.text_map.iter() {
+                            ui.selectable_value(&mut self.selected, *selected, text);
+                        }*/
                     }, );
             });
 
