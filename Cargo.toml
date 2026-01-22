@@ -7,14 +7,23 @@ edition = "2021"
 
 [dependencies]
 bytemuck = { version = "*" }
-colorgrad = { version = "0.8.0",features = ["preset"] }
-eframe = { version = "0.33.3", features = ["wgpu"] }
+colorgrad = { version = "0.8.0", features = ["preset"] }
+eframe = { version = "0.33.3", default-features = false, features = [
+    "wgpu",
+    "accesskit",
+    "default_fonts",
+    "wayland",
+    "web_screen_reader",
+    "x11",
+] }
+egui-wgpu = { version = "0.33.3"}
 egui_plot = "0.34.0"
-egui_glow = "0.33.3"
 log = "0.4.29"
-wasm-bindgen-futures = "*"
-web-sys = "=0.3.85"
-wgpu = { version = "*", features = ["webgl"] }
+wasm-bindgen = { version = "0.2.108" }
+wasm-bindgen-futures = "0.4.58"
+web-sys = "0.3.85"
+wgpu = { version = "27.0.1" }
+winit = "0.30.12"
 #palette = "0.7.2"
 #const-gen = "1.6.8"
-lazy_static = "1.5.0"
+#lazy_static = "1.5.0"

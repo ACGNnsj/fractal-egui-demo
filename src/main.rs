@@ -79,7 +79,10 @@ pub struct MyApp {
 impl MyApp {
     pub fn new<'a>(cc: &'a CreationContext<'a>, palette: [[f32; 4]; COLOR_NUM]) -> Option<Self> {
         // let wgpu_render_state = cc.wgpu_render_state.as_ref()?;
-        let wgpu_render_state = cc.wgpu_render_state.as_ref().expect("no wgpu_render_state");
+        let wgpu_render_state = cc
+            .wgpu_render_state
+            .as_ref()
+            .expect("No wgpu_render_state!");
 
         let device = &wgpu_render_state.device;
         let target_format = wgpu_render_state.target_format;
@@ -349,6 +352,7 @@ impl App for MyApp {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         // static mut JULIA_PAINTED: bool = false;
         egui::CentralPanel::default().show(ctx, |ui| unsafe {
+            ui.style_mut().visuals = eframe::egui::Visuals::dark();
             ui.horizontal(|ui| {
                 // ui.toggle_value(&mut self.show_mandelbrot, "Mandelbrot");
                 // ui.toggle_value(&mut self.show_julia, "Julia");
@@ -542,10 +546,7 @@ impl App for MyApp {
                 // ));
                 ui.painter()
                     .add(eframe::egui_wgpu::Callback::new_paint_callback(
-                        Rect {
-                            min: resp.response.rect.min,
-                            max: resp.response.rect.max,
-                        },
+                        resp.response.rect,
                         julia::JuliaCallback {
                             bounds,
                             points: Arc::clone(&self.julia_points),
@@ -645,7 +646,7 @@ fn main() {
 
 #[cfg(target_arch = "wasm32")]
 fn main() {
-    let grad = colorgrad::cubehelix_default().sharp(COLOR_NUM, 0.);
+    let grad = colorgrad::preset::cubehelix_default().sharp(COLOR_NUM as u16, 0.);
     // let colors=grad.take(1000).collect::<Vec<_>>();
     let colors = grad.colors(COLOR_NUM);
     static mut rgba_array: [[f32; 4]; 128] = [[0.0; 4]; COLOR_NUM];
@@ -659,30 +660,32 @@ fn main() {
 
     // 将 log 的信息重定向到 js 的 console.log
     eframe::WebLogger::init(log::LevelFilter::Trace).ok();
+
+    let wgpu_setup = WgpuSetup::CreateNew(WgpuSetupCreateNew {
+        // instance_descriptor: InstanceDescriptor {
+        //     backends: Backends::PRIMARY | Backends::GL,
+        //     ..Default::default()
+        // },
+        // power_preference: PowerPreference::HighPerformance,
+        device_descriptor: Arc::new(|adapter| wgpu::DeviceDescriptor {
+            label: Some("egui wgpu device"),
+            required_limits: if adapter.get_info().backend == wgpu::Backend::Gl {
+                wgpu::Limits::downlevel_webgl2_defaults()
+            } else {
+                wgpu::Limits::default()
+            },
+            required_features: wgpu::Features::default() | wgpu::Features::MAPPABLE_PRIMARY_BUFFERS,
+            ..Default::default()
+        }),
+        ..Default::default()
+    });
+
     let web_options = eframe::WebOptions {
         // initial_window_size: Some(Vec2::new(1024.0, 1024.0)),
         // centered: true,
         // renderer: eframe::Renderer::Wgpu,
         wgpu_options: WgpuConfiguration {
-            // supported_backends: wgpu::Backends::DX12,
-            device_descriptor: Arc::new(|adapter| {
-                let base_limits = if adapter.get_info().backend == wgpu::Backend::Gl {
-                    wgpu::Limits::downlevel_webgl2_defaults()
-                } else {
-                    wgpu::Limits::default()
-                };
-
-                wgpu::DeviceDescriptor {
-                    label: Some("egui wgpu device"),
-                    features: wgpu::Features::default() | wgpu::Features::MAPPABLE_PRIMARY_BUFFERS,
-                    limits: wgpu::Limits {
-                        // When using a depth buffer, we have to be able to create a texture
-                        // large enough for the entire surface, and we want to support 4k+ displays.
-                        max_texture_dimension_2d: 32768,
-                        ..base_limits
-                    },
-                }
-            }),
+            wgpu_setup,
             ..Default::default()
         },
         ..Default::default()
@@ -702,15 +705,14 @@ fn main() {
                 .dyn_into::<web_sys::HtmlCanvasElement>()
                 .expect("the_canvas_id was not a HtmlCanvasElement");
 
+            let app_creator: AppCreator<'static> = Box::new(move |cc| {
+                let app = MyApp::new(cc, rgba_array).unwrap();
+                Ok(Box::new(app) as Box<dyn App>)
+            });
+
             // 启动
             let start_result = eframe::WebRunner::new()
-                .start(
-                    &*canvas.id(),
-                    web_options,
-                    Box::new(move |cc| {
-                        Box::new(MyApp::new(cc, rgba_array).expect("failed to create app"))
-                    }),
-                )
+                .start(canvas, web_options, app_creator)
                 .await;
         });
     }

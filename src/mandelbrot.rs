@@ -115,7 +115,7 @@ impl MandelbrotRenderUtils {
                     palette,
                 }]),
                 usage: wgpu::BufferUsages::COPY_DST
-                    | wgpu::BufferUsages::MAP_WRITE
+                    // | wgpu::BufferUsages::MAP_WRITE
                     | wgpu::BufferUsages::UNIFORM,
             },
         );
@@ -126,7 +126,7 @@ impl MandelbrotRenderUtils {
                 label: Some("egui_plot_vertices"),
                 contents: bytemuck::cast_slice(&vec![Vertex::default(); VERTEX_NUM]),
                 usage: wgpu::BufferUsages::COPY_DST
-                    | wgpu::BufferUsages::MAP_WRITE
+                    // | wgpu::BufferUsages::MAP_WRITE
                     | wgpu::BufferUsages::VERTEX,
             },
         );
