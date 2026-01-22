@@ -6,7 +6,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bytemuck = { }
+bytemuck = { version = "*" }
 colorgrad = "0.6.2"
-eframe = { version = "0.22.0", features = ["wgpu"] }
+eframe = { version = "0.33.3", features = ["wgpu"] }
+egui_plot = "0.34.0"
+egui_glow = "0.33.3"
+log = "0.4.29"
+wasm-bindgen-futures = "*"
+web-sys = "=0.3.85"
+wgpu = { version = "*", features = ["webgl"] }
 #palette = "0.7.2"
