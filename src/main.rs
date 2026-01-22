@@ -25,12 +25,35 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 const COLOR_NUM: usize = 128;
-const KEYS: [i32; 39] = [
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-    26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
-];
+// const KEYS: [i32; 38] = [
+//     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+//     26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
+// ];
+// lazy_static::lazy_static! {
+//     // 这里可以写任意运行时逻辑生成数组（比如循环、迭代器等）
+//     static ref KEYS: [i32; 38] = {
+//         (0..38).collect::<Vec<_>>().try_into().unwrap()
+//     };
+// }
+const KEYS: [usize; 38] = calculate_array();
+const fn calculate_array<const N: usize>() -> [usize; N] {
+    let mut res = [0; N];
+    let mut i = 0;
+    while i < N {
+        res[i] = i;
+        i += 1;
+    }
+    res
+}
+
 // static mut SELECTED: i32 =1;
 const MAX_ITERATIONS: u32 = 65536;
+
+#[derive(PartialEq, Clone)]
+enum Mode {
+    Mandelbrot,
+    Julia,
+}
 
 pub struct MyApp {
     show_cpu: bool,
@@ -40,14 +63,16 @@ pub struct MyApp {
     julia_texture_id: epaint::TextureId,
     mandelbrot_points: Arc<Vec<Vertex>>,
     julia_points: Arc<Vec<Vertex>>,
-    last_selected: i32,
-    selected: i32,
-    text_map: HashMap<i32, String>,
+    last_selected: usize,
+    selected: usize,
+    // text_map: HashMap<i32, String>,
     // gradient_map: HashMap<String, dyn Fn() -> Gradient>,
-    gradient_map: HashMap<i32, fn() -> Gradient>,
+    gradient_map: HashMap<usize, (Box<dyn Gradient>, &'static str)>,
     max_iterations: u32,
-    show_mandelbrot: bool,
-    show_julia: bool,
+    mode: Mode,
+    last_mode: Mode,
+    // show_mandelbrot: bool,
+    // show_julia: bool,
     c: [f32; 2],
 }
 
@@ -93,51 +118,102 @@ impl MyApp {
             .callback_resources
             .insert(julia_util);
 
-        let presets = [
-            colorgrad::cubehelix_default,
-            colorgrad::inferno,
-            colorgrad::magma,
-            colorgrad::turbo,
-            colorgrad::cividis,
-            colorgrad::sinebow,
-            colorgrad::rainbow,
-            colorgrad::warm,
-            colorgrad::cool,
-            colorgrad::plasma,
-            colorgrad::viridis,
-            colorgrad::spectral,
-            colorgrad::blues,
-            colorgrad::greens,
-            colorgrad::greys,
-            colorgrad::oranges,
-            colorgrad::purples,
-            colorgrad::reds,
-            colorgrad::br_bg,
-            colorgrad::pr_gn,
-            colorgrad::pi_yg,
-            colorgrad::pu_or,
-            colorgrad::rd_bu,
-            colorgrad::rd_gy,
-            colorgrad::rd_yl_bu,
-            colorgrad::rd_yl_gn,
-            colorgrad::bu_gn,
-            colorgrad::bu_pu,
-            colorgrad::gn_bu,
-            colorgrad::or_rd,
-            colorgrad::pu_bu_gn,
-            colorgrad::pu_bu,
-            colorgrad::pu_rd,
-            colorgrad::rd_pu,
-            colorgrad::rd_yl_gn,
-            colorgrad::yl_gn_bu,
-            colorgrad::yl_gn,
-            colorgrad::yl_or_br,
-            colorgrad::yl_or_rd,
-        ];
-        let gradient_map: HashMap<i32, fn() -> Gradient> = {
-            let mut map: HashMap<i32, fn() -> Gradient> = HashMap::new();
+        // let presets = [
+        //     colorgrad::cubehelix_default,
+        //     colorgrad::inferno,
+        //     colorgrad::magma,
+        //     colorgrad::turbo,
+        //     colorgrad::cividis,
+        //     colorgrad::sinebow,
+        //     colorgrad::rainbow,
+        //     colorgrad::warm,
+        //     colorgrad::cool,
+        //     colorgrad::plasma,
+        //     colorgrad::viridis,
+        //     colorgrad::spectral,
+        //     colorgrad::blues,
+        //     colorgrad::greens,
+        //     colorgrad::greys,
+        //     colorgrad::oranges,
+        //     colorgrad::purples,
+        //     colorgrad::reds,
+        //     colorgrad::br_bg,
+        //     colorgrad::pr_gn,
+        //     colorgrad::pi_yg,
+        //     colorgrad::pu_or,
+        //     colorgrad::rd_bu,
+        //     colorgrad::rd_gy,
+        //     colorgrad::rd_yl_bu,
+        //     colorgrad::rd_yl_gn,
+        //     colorgrad::bu_gn,
+        //     colorgrad::bu_pu,
+        //     colorgrad::gn_bu,
+        //     colorgrad::or_rd,
+        //     colorgrad::pu_bu_gn,
+        //     colorgrad::pu_bu,
+        //     colorgrad::pu_rd,
+        //     colorgrad::rd_pu,
+        //     colorgrad::rd_yl_gn,
+        //     colorgrad::yl_gn_bu,
+        //     colorgrad::yl_gn,
+        //     colorgrad::yl_or_br,
+        //     colorgrad::yl_or_rd,
+        // ];
+
+        macro_rules! preset {
+            ($name:ident) => {
+                (Box::new(colorgrad::preset::$name()), stringify!($name))
+            };
+        }
+
+        pub fn preset() -> Vec<(Box<dyn Gradient>, &'static str)> {
+            vec![
+                preset!(sinebow),
+                preset!(turbo),
+                preset!(cividis),
+                preset!(rainbow),
+                preset!(cubehelix_default),
+                preset!(warm),
+                preset!(cool),
+                preset!(viridis),
+                preset!(inferno),
+                preset!(magma),
+                preset!(plasma),
+                preset!(bu_gn),
+                preset!(bu_pu),
+                preset!(gn_bu),
+                preset!(or_rd),
+                preset!(pu_bu_gn),
+                preset!(pu_bu),
+                preset!(pu_rd),
+                preset!(rd_pu),
+                preset!(yl_gn_bu),
+                preset!(yl_gn),
+                preset!(yl_or_br),
+                preset!(yl_or_rd),
+                preset!(br_bg),
+                preset!(pr_gn),
+                preset!(pi_yg),
+                preset!(pu_or),
+                preset!(rd_bu),
+                preset!(rd_gy),
+                preset!(rd_yl_bu),
+                preset!(rd_yl_gn),
+                preset!(spectral),
+                preset!(blues),
+                preset!(greens),
+                preset!(greys),
+                preset!(oranges),
+                preset!(purples),
+                preset!(reds),
+            ]
+        }
+
+        let presets = preset();
+        let gradient_map: HashMap<usize, (Box<dyn Gradient>, &'static str)> = {
+            let mut map: HashMap<usize, (Box<dyn Gradient>, &'static str)> = HashMap::new();
             for i in 0..KEYS.len() {
-                map.insert(KEYS[i], presets[i]);
+                map.insert(KEYS[i], presets[i].clone());
             }
             map
         };
@@ -152,54 +228,54 @@ impl MyApp {
             }
             texts
         };*/
-        let texts = [
-            "cubehelix",
-            "inferno",
-            "magma",
-            "turbo",
-            "cividis",
-            "sinebow",
-            "rainbow",
-            "warm",
-            "cool",
-            "plasma",
-            "viridis",
-            "spectral",
-            "blues",
-            "greens",
-            "greys",
-            "oranges",
-            "purples",
-            "reds",
-            "br_bg",
-            "pr_gn",
-            "pi_yg",
-            "pu_or",
-            "rd_bu",
-            "rd_gy",
-            "rd_yl_bu",
-            "rd_yl_gn",
-            "bu_gn",
-            "bu_pu",
-            "gn_bu",
-            "or_rd",
-            "pu_bu_gn",
-            "pu_bu",
-            "pu_rd",
-            "rd_pu",
-            "rd_yl_gn",
-            "yl_gn_bu",
-            "yl_gn",
-            "yl_or_br",
-            "yl_or_rd",
-        ];
-        let text_map = {
-            let mut map = HashMap::new();
-            for i in 0..KEYS.len() {
-                map.insert(KEYS[i], texts[i].to_string());
-            }
-            map
-        };
+        // let texts = [
+        //     "cubehelix",
+        //     "inferno",
+        //     "magma",
+        //     "turbo",
+        //     "cividis",
+        //     "sinebow",
+        //     "rainbow",
+        //     "warm",
+        //     "cool",
+        //     "plasma",
+        //     "viridis",
+        //     "spectral",
+        //     "blues",
+        //     "greens",
+        //     "greys",
+        //     "oranges",
+        //     "purples",
+        //     "reds",
+        //     "br_bg",
+        //     "pr_gn",
+        //     "pi_yg",
+        //     "pu_or",
+        //     "rd_bu",
+        //     "rd_gy",
+        //     "rd_yl_bu",
+        //     "rd_yl_gn",
+        //     "bu_gn",
+        //     "bu_pu",
+        //     "gn_bu",
+        //     "or_rd",
+        //     "pu_bu_gn",
+        //     "pu_bu",
+        //     "pu_rd",
+        //     "rd_pu",
+        //     "rd_yl_gn",
+        //     "yl_gn_bu",
+        //     "yl_gn",
+        //     "yl_or_br",
+        //     "yl_or_rd",
+        // ];
+        // let text_map = {
+        //     let mut map = HashMap::new();
+        //     for i in 0..KEYS.len() {
+        //         map.insert(KEYS[i], texts[i].to_string());
+        //     }
+        //     map
+        // };
 
         Some(Self {
             show_cpu: false,
@@ -209,13 +285,15 @@ impl MyApp {
             julia_texture_id,
             mandelbrot_points: Arc::new(mandelbrot_vertices()),
             julia_points: Arc::new(julia_vertices()),
-            last_selected: 0,
-            selected: 0,
-            text_map,
+            last_selected: 4,
+            selected: 4,
+            // text_map,
             gradient_map,
             max_iterations: MAX_ITERATIONS,
-            show_mandelbrot: true,
-            show_julia: false,
+            // show_mandelbrot: true,
+            // show_julia: false,
+            mode: Mode::Mandelbrot,
+            last_mode: Mode::Mandelbrot,
             c: [0.0, 0.0],
         })
     }
@@ -269,11 +347,13 @@ fn julia_vertices() -> Vec<Vertex> {
 
 impl App for MyApp {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
-        static mut JULIA_PAINTED: bool = false;
+        // static mut JULIA_PAINTED: bool = false;
         egui::CentralPanel::default().show(ctx, |ui| unsafe {
             ui.horizontal(|ui| {
-                ui.toggle_value(&mut self.show_mandelbrot, "Mandelbrot");
-                ui.toggle_value(&mut self.show_julia, "Julia");
+                // ui.toggle_value(&mut self.show_mandelbrot, "Mandelbrot");
+                // ui.toggle_value(&mut self.show_julia, "Julia");
+                ui.radio_value(&mut self.mode, Mode::Mandelbrot, "Mandelbrot");
+                ui.radio_value(&mut self.mode, Mode::Julia, "Julia");
                 ui.label("max_iterations");
                 ui.add(
                     egui::Slider::new(&mut self.max_iterations, 128..=MAX_ITERATIONS)
@@ -283,22 +363,18 @@ impl App for MyApp {
                 // ui.toggle_value(&mut self.show_gpu, "GPU");
                 ui.label("color gradient");
                 egui::ComboBox::from_label("")
-                    .selected_text(
-                        self.text_map
-                            .get(&self.selected)
-                            .unwrap_or(&"None".to_string()),
-                    )
+                    .selected_text(self.gradient_map.get(&self.selected).unwrap().1)
                     // .selected_ext(format!("{:?}", self.selected))
                     .show_ui(ui, |ui| {
                         for key in KEYS {
                             ui.selectable_value(
                                 &mut self.selected,
                                 key,
-                                self.text_map.get(&key).unwrap_or(&"None".to_string()),
+                                self.gradient_map.get(&key).unwrap().1,
                             );
                         }
                     });
-                if self.show_julia {
+                if self.mode == Mode::Julia {
                     ui.label("Re(c)");
                     ui.add(egui::Slider::new(&mut self.c[0], -2.0..=2.0).step_by(0.001));
                     ui.label("Im(c)");
@@ -306,7 +382,7 @@ impl App for MyApp {
                 }
             });
 
-            if self.show_mandelbrot {
+            if self.mode == Mode::Mandelbrot {
                 let mut bounds = PlotBounds::NOTHING;
                 let resp = egui_plot::Plot::new("Mandelbrot_plot")
                     .legend(Legend::default())
@@ -346,13 +422,11 @@ impl App for MyApp {
                     util.set_max_iterations(self.max_iterations);
                 }
 
-                if self.selected != self.last_selected {
+                if self.selected != self.last_selected || self.mode != self.last_mode {
                     self.dirty = true;
-                    let preset: &fn() -> Gradient = self
-                        .gradient_map
-                        .get(&self.selected)
-                        .unwrap_or(&(colorgrad::cubehelix_default as fn() -> Gradient));
-                    let grad = preset().sharp(COLOR_NUM, 0.);
+                    let preset: &(Box<dyn Gradient>, &'static str) =
+                        self.gradient_map.get(&self.selected).unwrap();
+                    let grad = preset.0.sharp(COLOR_NUM as u16, 0.);
                     let rgba_array: [[f32; 4]; COLOR_NUM] = grad
                         .colors(COLOR_NUM)
                         .iter()
@@ -395,11 +469,11 @@ impl App for MyApp {
                 );
             }
 
-            if self.show_julia {
-                if !JULIA_PAINTED {
-                    self.dirty = true;
-                    JULIA_PAINTED = true;
-                }
+            if self.mode == Mode::Julia {
+                // if !JULIA_PAINTED {
+                //     self.dirty = true;
+                //     JULIA_PAINTED = true;
+                // }
                 let mut bounds = PlotBounds::NOTHING;
                 let resp = egui_plot::Plot::new("Julia_plot")
                     .legend(Legend::default())
@@ -438,13 +512,11 @@ impl App for MyApp {
                     util.set_max_iterations(self.max_iterations);
                 }
 
-                if self.selected != self.last_selected {
+                if self.selected != self.last_selected || self.mode != self.last_mode {
                     self.dirty = true;
-                    let preset: &fn() -> Gradient = self
-                        .gradient_map
-                        .get(&self.selected)
-                        .unwrap_or(&(colorgrad::cubehelix_default as fn() -> Gradient));
-                    let grad = preset().sharp(COLOR_NUM, 0.);
+                    let preset: &(Box<dyn Gradient>, &'static str) =
+                        self.gradient_map.get(&self.selected).unwrap();
+                    let grad = preset.0.sharp(COLOR_NUM as u16, 0.);
                     let rgba_array: [[f32; 4]; COLOR_NUM] = grad
                         .colors(COLOR_NUM)
                         .iter()
@@ -494,13 +566,14 @@ impl App for MyApp {
 
             self.dirty = false;
             self.last_selected = self.selected;
+            self.last_mode = self.mode.clone();
         });
     }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    let grad = colorgrad::cubehelix_default().sharp(COLOR_NUM, 0.);
+    let grad = colorgrad::preset::cubehelix_default().sharp(COLOR_NUM as u16, 0.);
     // let colors=grad.take(1000).collect::<Vec<_>>();
     let colors = grad.colors(COLOR_NUM);
     let mut rgba_array = [[0.0; 4]; COLOR_NUM];
