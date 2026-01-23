@@ -582,21 +582,31 @@ fn main() {
         rgba_array[i] = [c.r as f32, c.g as f32, c.b as f32, c.a as f32];
     }
 
+
+
     let wgpu_setup = WgpuSetup::CreateNew(WgpuSetupCreateNew {
         // instance_descriptor: InstanceDescriptor {
         //     backends: Backends::PRIMARY | Backends::GL,
         //     ..Default::default()
         // },
         // power_preference: PowerPreference::HighPerformance,
-        device_descriptor: Arc::new(|adapter| wgpu::DeviceDescriptor {
-            label: Some("egui wgpu device"),
-            required_limits: if adapter.get_info().backend == wgpu::Backend::Gl {
+        device_descriptor: Arc::new(|adapter| {
+            let base_limits = if adapter.get_info().backend == wgpu::Backend::Gl {
                 wgpu::Limits::downlevel_webgl2_defaults()
             } else {
                 wgpu::Limits::default()
-            },
-            required_features: wgpu::Features::default() | wgpu::Features::MAPPABLE_PRIMARY_BUFFERS,
-            ..Default::default()
+            };
+            wgpu::DeviceDescriptor {
+                label: Some("egui wgpu device"),
+                required_limits: wgpu::Limits {
+                    // When using a depth buffer, we have to be able to create a texture
+                    // large enough for the entire surface, and we want to support 4k+ displays.
+                    max_texture_dimension_2d: 32768,
+                    ..base_limits
+                },
+                required_features: wgpu::Features::default() | wgpu::Features::MAPPABLE_PRIMARY_BUFFERS,
+                ..Default::default()
+            }
         }),
         ..Default::default()
     });
@@ -667,15 +677,23 @@ fn main() {
         //     ..Default::default()
         // },
         // power_preference: PowerPreference::HighPerformance,
-        device_descriptor: Arc::new(|adapter| wgpu::DeviceDescriptor {
-            label: Some("egui wgpu device"),
-            required_limits: if adapter.get_info().backend == wgpu::Backend::Gl {
+        device_descriptor: Arc::new(|adapter| {
+            let base_limits = if adapter.get_info().backend == wgpu::Backend::Gl {
                 wgpu::Limits::downlevel_webgl2_defaults()
             } else {
                 wgpu::Limits::default()
-            },
-            required_features: wgpu::Features::default() | wgpu::Features::MAPPABLE_PRIMARY_BUFFERS,
-            ..Default::default()
+            };
+            wgpu::DeviceDescriptor {
+                label: Some("egui wgpu device"),
+                required_limits: wgpu::Limits {
+                    // When using a depth buffer, we have to be able to create a texture
+                    // large enough for the entire surface, and we want to support 4k+ displays.
+                    max_texture_dimension_2d: 16384,
+                    ..base_limits
+                },
+                required_features: wgpu::Features::default() | wgpu::Features::MAPPABLE_PRIMARY_BUFFERS,
+                ..Default::default()
+            }
         }),
         ..Default::default()
     });
